@@ -129,40 +129,40 @@ def find_col_date_in_rows(s_file_name, f, df):
 
 # # ______________________________________________________________________________________________________________________________#
 # # BOA Bank _____________________________________________________________________________________________________________________#
-# source_folder = r'\\frwy\main\MXTJ\ACCT\Acct\Acct2021\Freeway\Banks Download\BOA TN'
-# # r'\*' + m + '.*' + d + '*.xls*'   was : r'\*07.13.*21.xls*'
-# #files_list = glob.glob(source_folder + r'\*MAY MTD 2022.xls*') # monthlys
-# files_list = glob.glob(source_folder + r'\*' + m + '.' + d + '.*' + y + '.xls*') # All
-# for f in files_list:
-#     if not "~$" in f:
-#         print('adding: ' + f)
-#         db = pd.read_excel(f, parse_dates=True)
-#         db.columns = db.iloc[4]     # set row 4  as header 
-#         db = db[(db['Row Type'] == 'Data') & (db['Data Type'] != 'Summary')]
+# account table with relation between full account number and codified account number given on email bank statement
+acc_dic = {'Account':['FISA-BOA-OPERATING-5946','FISA-BOA-TRUST-4285','FISA-BOA-TRUST-5637','FISA-BOA-TRUST-5725','FISA-BOA-TRUST-6095','VLX-BOA-OPERATING-3827','VLX-BOA-OPERATING-8862','VLX-BOA-TRUST-7435','VLX-BOA-TRUST-9233'],
+           'Acc_number' :['325077115946','488074004285','488038465637','325077145725','4787486095','334048413827','334045318862','334054547435','334045319233']}       
+df_accounts_map = pd.DataFrame.from_dict(acc_dic)
+
+source_folder = r'\\frwy\main\MXTJ\ACCT\Acct\Acct2021\Freeway\Banks Download\BOA PD'
+files_list = glob.glob(source_folder + r'\*' + m + '.' + d + '.*' + y + '.xls*') # All
+#read_file = files_list[-1]  # only read one file not need to for loop
+
+for f in files_list:
+    if not "~$" in f:
+        print('adding: ' + f)
+        db = pd.read_excel(f,  usecols="C,D,E,K" ,  parse_dates=True)
         
-#         # add column with file name 
-#         file_name = f.replace(source_folder + '\\' , "")  
-#         db['file_name'] = file_name
-#         db['bank'] = "BOA"
-#         db.rename(columns={"As of Date": "bank_date", "Account Number": "Account"}, inplace = True)  
-#         db['bank_date'] = pd.to_datetime(db['bank_date'])  # convert string to dates 
-#         #db['bank_date'] = pd.to_datetime(db['bank_date']).dt.strftime('%m/%d/%Y') # format date as mm/dd/yyyy
-#         # compilation
-#         #db1 = db1.append(db, ignore_index=True)
-#         db1 = pd.concat([db1, db], ignore_index=True)
-#         db = None
+        # add column with file name 
+        file_name = f.replace(source_folder + '\\' , "")  
+        db['file_name'] = file_name
+        #db['bank'] = "BOA"
+        db.rename(columns={"Trans.date": "bank_date", "Account description": "Account", "Flow amount (value)": "Amount", "Bank": "bank"}, inplace = True)  
+        
+        db["bank_date"] = db["bank_date"].apply(valid_date)
+                        
+        # add column with last 4digits 
+        #db['Last4'] = db['Account'].str.slice(start=-4)
+        db1 = db.merge(df_accounts_map, how='right')       
+        
 
-# # Display data >>>>>>>>>>>>  
-# #db1['bank_date']=db1['bank_date'].astype(str)
-# #table1 = pd.pivot_table(db1, values = 'Amount', index = ['bank','Account'], columns = ['bank_date'], aggfunc = 'count')
-
-# # test 
-# if not len(files_list) == 0:
-#     table1_validation = True
-#     table1 = pd.pivot_table(db1, values = 'Amount', index = ['bank','Account'], columns = ['bank_date'], aggfunc = 'count')
-# else:
-#     table1_validation = False
-#     table1 = pd.DataFrame({'bank':['BOA'], 'Account':[488042589392], current_date:[0]}) # create empty table
+# Display data >>>>>>>>>>>>  
+if not len(files_list) == 0:
+    table1_validation = True
+    table1 = pd.pivot_table(db1, values = 'Amount', index = ['bank','Acc_number'], columns = ['bank_date'], aggfunc = 'count')
+else:
+    table1_validation = False
+    table1 = pd.DataFrame.from_dict({'bank':['BOA'], 'Account':[488042589392], current_date:[0]}) # create empty table
 
 
 # ________________________________________________________________________________________________________________________________________
@@ -193,7 +193,9 @@ if not len(files_list) == 0:
     table2 = pd.pivot_table(db2, values = 'Amount', index = ['bank','Account'], columns = ['bank_date'], aggfunc = 'count')
 else:
     table2_validation = False
-    table2 = pd.DataFrame({'bank':['53rd'], 'Account':[7934337234], current_date:[0]}) # create empty table
+    table2 = pd.DataFrame.from_dict({'bank':['53rd'], 'Account':[7934337234], current_date:[0]}) # create empty table
+
+
 # ________________________________________________________________________________________________________________________________________
 # the rest of Bank accounts___________________________________________________________________________________________________________________
 # PROCESS:  Search for month input number in each file from  folder list(f_names). 
@@ -306,20 +308,23 @@ table4 = pd.pivot_table(db3, values = 'Amount', index = ['bank','Account'], colu
 # WRAP : 
 # Merge tables 
 
-# test
-table = pd.concat([table2, table3, table4])
+# table1 = BOA
+# table2 = 53th bank
+# table3 = all bank on list 
+# table4 = US bank
 
-# if table1_validation and table2_validation:
-#     table = pd.concat([table1 , table2, table3, table4])
-#     table = table.reset_index()
-# elif not table1_validation and table2_validation:
-#     table = pd.concat([table2, table3, table4])
-#     table = table.reset_index()
-# elif table1_validation and not table2_validation:
-#     table = pd.concat([table1, table3, table4])
-#     table = table.reset_index()
-# else:    
-#     table = pd.concat([table3, table4])
+# test
+if table1_validation and table2_validation:
+    table = pd.concat([table1 , table2, table3, table4])
+    
+elif not table1_validation and table2_validation:
+    table = pd.concat([table2, table3, table4])
+    
+elif table1_validation and not table2_validation:
+    table = pd.concat([table1, table3, table4])
+    
+else:    
+    table = pd.concat([table3, table4])
 
 # save
 timemark = datetime.today().strftime('%Y-%m-%d %H.%M.%S')
@@ -336,3 +341,4 @@ with pd.ExcelWriter(destination_Folder + xl_file_name) as writer:
 d_path = os.path.realpath(destination_Folder)
 os.startfile(d_path)
 os.system('start excel.exe "' + destination_Folder + xl_file_name + '"')
+
